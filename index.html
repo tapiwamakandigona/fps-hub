@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FPS ARENA — play free in your browser | fps.tapiwa.me</title>
+  <meta name="description" content="FPS Arena — a browser zombie-survival FPS built with Three.js. No install, no login. Pick a version and play." />
+  <meta property="og:title" content="FPS ARENA — play free in your browser" />
+  <meta property="og:description" content="Browser zombie-survival FPS. Campaign, endless horde, OPS missions, global leaderboards. No install — click and play." />
+  <meta property="og:url" content="https://fps.tapiwa.me" />
+  <meta name="theme-color" content="#05060a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #05060a;
+      --panel: #0b0e15;
+      --panel-2: #0e1219;
+      --line: #1c2331;
+      --txt: #d7dee9;
+      --dim: #77839a;
+      --acc: #ffb02e;      /* HUD amber */
+      --acc-2: #35e08b;    /* radar green */
+      --danger: #ff4757;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--txt);
+      font-family: 'Chakra Petch', system-ui, sans-serif;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+    ::selection { background: var(--acc); color: #000; }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+
+    /* ambient grid + vignette */
+    .backdrop {
+      position: fixed; inset: 0; z-index: -1;
+      background:
+        radial-gradient(ellipse 80% 55% at 50% -5%, rgba(255,176,46,.07), transparent 60%),
+        radial-gradient(ellipse 70% 50% at 50% 110%, rgba(53,224,139,.05), transparent 60%),
+        var(--bg);
+    }
+    .backdrop::after {
+      content: ''; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(120,140,180,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120,140,180,.05) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, #000 30%, transparent 75%);
+    }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+
+    /* top strip */
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px 0; font-size: 12px; letter-spacing: .14em;
+      color: var(--dim); text-transform: uppercase;
+    }
+    .topbar a { color: var(--dim); text-decoration: none; }
+    .topbar a:hover { color: var(--txt); }
+    .status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background: var(--acc-2); margin-right:7px; box-shadow: 0 0 8px var(--acc-2); animation: blink 2.4s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    /* hero */
+    .hero { text-align: center; padding: 72px 0 56px; }
+    .hero .kicker {
+      font-size: 12px; letter-spacing: .32em; color: var(--acc);
+      text-transform: uppercase; margin-bottom: 18px;
+    }
+    .hero h1 {
+      font-size: clamp(52px, 10vw, 108px);
+      font-weight: 700; letter-spacing: .04em; line-height: .95;
+      text-transform: uppercase;
+    }
+    .hero h1 .thin { color: transparent; -webkit-text-stroke: 2px rgba(215,222,233,.55); }
+    .hero .sub {
+      max-width: 560px; margin: 22px auto 0; color: var(--dim); font-size: 17px;
+    }
+    .hero .sub b { color: var(--txt); font-weight: 600; }
+    .cta-row { margin-top: 36px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; text-decoration: none; text-transform: uppercase;
+      font-weight: 700; letter-spacing: .12em; font-size: 15px;
+      padding: 16px 38px; border: 1px solid transparent; transition: all .15s ease;
+      clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    }
+    .btn-primary { background: var(--acc); color: #0a0800; }
+    .btn-primary:hover { background: #ffc75e; transform: translateY(-2px); }
+    .btn-ghost { border-color: var(--line); color: var(--txt); background: rgba(255,255,255,.02); }
+    .btn-ghost:hover { border-color: var(--dim); }
+    .hero .fine { margin-top: 18px; font-size: 12px; color: var(--dim); letter-spacing: .08em; }
+    .hero .fine .sep { margin: 0 10px; opacity: .4; }
+
+    /* section headers */
+    section { padding: 30px 0 10px; }
+    .sec-head {
+      display: flex; align-items: baseline; gap: 14px;
+      border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 26px;
+    }
+    .sec-head h2 { font-size: 15px; letter-spacing: .26em; text-transform: uppercase; color: var(--txt); }
+    .sec-head span { font-size: 12px; color: var(--dim); letter-spacing: .1em; }
+
+    /* flagship card */
+    .flagship {
+      display: grid; grid-template-columns: 1.25fr 1fr; gap: 0;
+      border: 1px solid var(--line); background: linear-gradient(160deg, var(--panel-2), var(--panel));
+      position: relative; overflow: hidden;
+    }
+    .flagship::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--acc), transparent 70%);
+    }
+    .flagship .info { padding: 38px 40px; }
+    .tag {
+      display: inline-block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+      padding: 4px 10px; margin-bottom: 16px; font-weight: 600;
+    }
+    .tag-live { color: var(--acc); border: 1px solid rgba(255,176,46,.4); background: rgba(255,176,46,.07); }
+    .tag-archive { color: var(--dim); border: 1px solid var(--line); }
+    .tag-dev { color: var(--acc-2); border: 1px solid rgba(53,224,139,.35); background: rgba(53,224,139,.06); }
+    .flagship h3 { font-size: 34px; text-transform: uppercase; letter-spacing: .05em; }
+    .flagship .build { font-size: 12px; color: var(--acc-2); margin: 4px 0 16px; letter-spacing: .08em; }
+    .flagship p { color: var(--dim); font-size: 15px; max-width: 46ch; }
+    .flagship .info .btn { margin-top: 26px; }
+    .featlist {
+      border-left: 1px solid var(--line); padding: 38px 40px;
+      display: flex; flex-direction: column; justify-content: center; gap: 15px;
+    }
+    .feat { display: flex; gap: 12px; align-items: baseline; font-size: 14px; }
+    .feat .k { color: var(--acc); font-size: 11px; letter-spacing: .1em; min-width: 18px; }
+    .feat .t { color: var(--txt); white-space: nowrap; }
+    .feat .d { color: var(--dim); }
+
+    /* archive grid */
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card {
+      border: 1px solid var(--line); background: var(--panel);
+      padding: 28px 26px; text-decoration: none; display: block;
+      transition: border-color .15s ease, transform .15s ease, background .15s ease;
+      position: relative;
+    }
+    .card:hover { border-color: rgba(255,176,46,.45); transform: translateY(-3px); background: var(--panel-2); }
+    .card h4 { color: var(--txt); font-size: 19px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+    .card p { color: var(--dim); font-size: 13.5px; min-height: 60px; }
+    .card .go { margin-top: 18px; font-size: 12px; letter-spacing: .18em; color: var(--acc); text-transform: uppercase; font-weight: 600; }
+    .card .go::after { content: ' →'; transition: margin .15s; }
+    .card:hover .go::after { margin-left: 5px; }
+    .card.dev { opacity: .75; cursor: default; }
+    .card.dev:hover { transform: none; border-color: var(--line); background: var(--panel); }
+
+    /* how to play */
+    .howto { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .step { border: 1px solid var(--line); background: var(--panel); padding: 24px 26px; }
+    .step .n { font-size: 12px; color: var(--acc); letter-spacing: .2em; margin-bottom: 10px; }
+    .step h5 { font-size: 15px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .step p { color: var(--dim); font-size: 13.5px; }
+    kbd {
+      font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--txt);
+      border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px;
+      padding: 1px 6px; background: var(--panel-2);
+    }
+
+    /* final cta */
+    .final { text-align: center; padding: 70px 0 60px; }
+    .final h2 { font-size: clamp(26px, 4.5vw, 40px); text-transform: uppercase; letter-spacing: .06em; }
+    .final p { color: var(--dim); margin: 10px 0 28px; }
+
+    footer {
+      border-top: 1px solid var(--line); padding: 26px 0 40px;
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+      font-size: 12px; color: var(--dim); letter-spacing: .1em;
+    }
+    footer a { color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--line); }
+    footer a:hover { color: var(--txt); }
+
+    @media (max-width: 860px) {
+      .flagship { grid-template-columns: 1fr; }
+      .featlist { border-left: 0; border-top: 1px solid var(--line); }
+      .grid, .howto { grid-template-columns: 1fr; }
+      .card p { min-height: 0; }
+      .hero { padding: 52px 0 44px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <div class="wrap">
+
+    <div class="topbar">
+      <span><span class="status-dot"></span>ALL SYSTEMS LIVE</span>
+      <a href="https://tapiwa.me" target="_blank" rel="noopener">tapiwa.me</a>
+    </div>
+
+    <header class="hero">
+      <div class="kicker">// Browser zombie-survival FPS</div>
+      <h1>FPS <span class="thin">ARENA</span></h1>
+      <p class="sub">A full 3D shooter that runs in your browser tab. <b>No install. No login. No GPU required.</b> Campaign, endless hordes, OPS missions and global leaderboards — click and play.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://fpsarena-v4.appwrite.network" target="_blank" rel="noopener">▶ Play V4 — Latest</a>
+        <a class="btn btn-ghost" href="#versions">All versions</a>
+      </div>
+      <p class="fine mono">FREE<span class="sep">·</span>DESKTOP + MOBILE<span class="sep">·</span>BUILT WITH THREE.JS / WEBGL</p>
+    </header>
+
+    <section id="v4">
+      <div class="sec-head"><h2>Flagship</h2><span>the current build</span></div>
+      <div class="flagship">
+        <div class="info">
+          <span class="tag tag-live">● Live</span>
+          <h3>FPS Arena V4</h3>
+          <div class="build mono">BUILD: V4 M9 — FOOTSTEPS · OPS EVERYWHERE · SABOTAGE</div>
+          <p>The realistic remaster. Six arenas, seven weapons, boss fights, an armory economy and three OPS mission types on every map — plus surface-aware footsteps and real recorded weapon foley.</p>
+          <a class="btn btn-primary" href="https://fpsarena-v4.appwrite.network" target="_blank" rel="noopener">▶ Deploy into V4</a>
+        </div>
+        <div class="featlist">
+          <div class="feat"><span class="k mono">01</span><span class="t">6 arenas</span>&nbsp;<span class="d">— warehouse to OVERPASS &amp; BLACKSITE</span></div>
+          <div class="feat"><span class="k mono">02</span><span class="t">OPS missions</span>&nbsp;<span class="d">— HOLDOUT · EXFIL · SABOTAGE</span></div>
+          <div class="feat"><span class="k mono">03</span><span class="t">Campaign + Endless Horde</span>&nbsp;<span class="d">— boss waves</span></div>
+          <div class="feat"><span class="k mono">04</span><span class="t">Global leaderboards</span>&nbsp;<span class="d">— daily challenge seeds</span></div>
+          <div class="feat"><span class="k mono">05</span><span class="t">Real audio</span>&nbsp;<span class="d">— CC0-recorded reloads &amp; footsteps</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="versions">
+      <div class="sec-head"><h2>Version Archive</h2><span>every generation, still playable</span></div>
+      <div class="grid">
+        <a class="card" href="https://fpsarena-v3.appwrite.network" target="_blank" rel="noopener">
+          <span class="tag tag-archive">V3 · 2026</span>
+          <h4>FPS Arena v3</h4>
+          <p>The performance overhaul. Campaign + Endless Horde across three arenas, armory economy, daily challenges — tuned to hold big hordes on mobile.</p>
+          <span class="go">Play v3</span>
+        </a>
+        <a class="card" href="https://fpsarena-v2.appwrite.network" target="_blank" rel="noopener">
+          <span class="tag tag-archive">V2 · 2026</span>
+          <h4>FPS Arena v2</h4>
+          <p>Warehouse: Containment. The atmospheric rebuild — ACES filmic tone mapping, bloom and fog. Survive five escalating waves in an industrial warehouse.</p>
+          <span class="go">Play v2</span>
+        </a>
+        <a class="card" href="https://fpsarena-v1.appwrite.network" target="_blank" rel="noopener">
+          <span class="tag tag-archive">V1 · Origin</span>
+          <h4>FPS Arena</h4>
+          <p>Where it started. Wave-based zombie survival with mystery-box weapon drops — a custom TypeScript engine on raw Three.js.</p>
+          <span class="go">Play v1</span>
+        </a>
+      </div>
+      <div style="margin-top:18px">
+        <div class="card dev">
+          <span class="tag tag-dev">IN DEVELOPMENT</span>
+          <h4 style="display:inline; margin-left:10px;">FPS Arena — Godot Edition</h4>
+          <p style="min-height:0; margin-top:8px;">A ground-up remake in Godot 4 targeting real-time lighting and animation on modest hardware. In the lab — it will appear here when it's playable.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="howto">
+      <div class="sec-head"><h2>How to Play</h2><span>you already know how</span></div>
+      <div class="howto">
+        <div class="step">
+          <div class="n mono">STEP 01</div>
+          <h5>Click a version</h5>
+          <p>The game loads in seconds — no download, no account, nothing to install. Works on desktop and phone (landscape).</p>
+        </div>
+        <div class="step">
+          <div class="n mono">STEP 02</div>
+          <h5>Lock in</h5>
+          <p><kbd>WASD</kbd> move · <kbd>Mouse</kbd> look · <kbd>Click</kbd> shoot · <kbd>R</kbd> reload · <kbd>Shift</kbd> sprint · <kbd>G</kbd> grenade · <kbd>Esc</kbd> pause</p>
+        </div>
+        <div class="step">
+          <div class="n mono">STEP 03</div>
+          <h5>Climb the boards</h5>
+          <p>Clear waves to earn coins, unlock the armory, and post your score to the global leaderboard. Daily challenge resets every 24h.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <h2>The horde is waiting.</h2>
+      <p>Average first session: one "quick round" that becomes an hour.</p>
+      <a class="btn btn-primary" href="https://fpsarena-v4.appwrite.network" target="_blank" rel="noopener">▶ Play FPS Arena V4</a>
+    </section>
+
+    <footer>
+      <span>© 2026 <a href="https://tapiwa.me" target="_blank" rel="noopener">Tapiwa Makandigona</a> — Harare, Zimbabwe</span>
+      <span class="mono">FPS.TAPIWA.ME</span>
+    </footer>
+  </div>
+</body>
+</html>
